@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,92 +11,176 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
 )
 
+var mutex = &sync.Mutex{}
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+var clients = make(map[*websocket.Conn]bool)
+
 func main() {
-	if _, err := os.Stat("src/files"); os.IsNotExist(err) {
-		os.MkdirAll("src/files", 0755)
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/upload", uploadHandler)
+	http.HandleFunc("/ws", wsHandler)
+	http.HandleFunc("/download/", downloadHandler)
+
+	fmt.Println("Server running on http://localhost:3001")
+	log.Fatal(http.ListenAndServe("127.0.0.1:3001", nil))
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "index.html")
+}
+
+func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	file, _, err := r.FormFile("files")
+	if err != nil {
+		http.Error(w, "Unable to read file", http.StatusBadRequest)
+		log.Println("File read error:", err)
+		return
+	}
+	defer file.Close()
+
+	tempFile, err := ioutil.TempFile("./", "upload-*.tmp")
+	if err != nil {
+		http.Error(w, "Server error", http.StatusInternalServerError)
+		log.Println("Temp file error:", err)
+		return
 	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "src/uploader.html")
-	})
+	fileBytes, _ := ioutil.ReadAll(file)
+	tempFile.Write(fileBytes)
+	fileName := filepath.Base(tempFile.Name())
+	tempFile.Close()
 
-	http.HandleFunc("/upload", func(w http.ResponseWriter, r *http.Request) {
-		r.ParseMultipartForm(10 << 20) // 10 MB limit
-		file, _, err := r.FormFile("files")
+	language := getFormValueOrDefault(r, "language", "Spanish")
+	model := getFormValueOrDefault(r, "model", "small")
+
+	cmdStr := fmt.Sprintf("whisper %s --language %s --model %s --output_format txt", fileName, language, model)
+	fmt.Println(cmdStr)
+
+	log.Println("Got the file. About to transcribe...")
+	go executeCommand(cmdStr, fileName)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{"message": "File uploaded successfully"})
+}
+
+func wsHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("WebSocket connected")
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Printf("WebSocket Upgrade Error: %v", err)
+		return
+	}
+	mutex.Lock()
+	clients[conn] = true
+	mutex.Unlock()
+	log.Println("Added client, clients are now: ", clients)
+	defer func() {
+		log.Println("WebSocket disconnected")
+		mutex.Lock()
+		delete(clients, conn)
+		mutex.Unlock()
+		conn.Close()
+	}()
+	for {
+		messageType, p, err := conn.ReadMessage()
 		if err != nil {
-			log.Fatal(err)
+			log.Println("WebSocket read error: ", err)
 			return
 		}
-		defer file.Close()
-
-		tempFile, err := ioutil.TempFile("./", "upload-*.tmp")
-		if err != nil {
-			log.Fatal(err)
+		// Echo back for now; this can be changed to whatever processing you need
+		if err := conn.WriteMessage(messageType, p); err != nil {
+			log.Println("WebSocket write error: ", err)
 			return
 		}
-		defer tempFile.Close()
+	}
+}
 
-		fileBytes, _ := ioutil.ReadAll(file)
-		tempFile.Write(fileBytes)
-		fileName := filepath.Base(tempFile.Name())
+func downloadHandler(w http.ResponseWriter, r *http.Request) {
+	fileName := filepath.Base(r.URL.Path)
+	filePath := "./" + fileName
 
-		//Handle parameters and command variables
-		language := ""
-		if r.FormValue("language") == "" {
-			language = "--language Spanish"
-		} else {
-			language = "--language " + r.FormValue("language")
-		}
+	http.ServeFile(w, r, filePath)
+	// Delete the file
+	err := os.Remove(filePath)
+	if err != nil {
+		log.Printf("Failed to remove file: %v", err)
+	} else {
+		log.Println("File removed:", filePath)
+	}
+}
 
-		model := ""
-		if r.FormValue("model") == "" {
-			model = "--model small"
-		} else {
-			model = "--model " + r.FormValue("model")
-		}
+func executeCommand(commandStr, fileName string) {
+	// Split command string into command and arguments
+	cmdFields := strings.Fields(commandStr)
 
-		translate := ""
-		if r.FormValue("translate") == "" {
-			translate = ""
-		} else {
-			translate = "--translate " + r.FormValue("translate")
-		}
+	// Create a new context with a timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 
-		// Combine into whisper command arguments
-		cmdStr := fmt.Sprintf("whisper %s %s %s %s", fileName, language, model, translate)
-		fmt.Println(cmdStr)
-		// Run whisper command
-		cmd := exec.Command("sh", "-c", cmdStr)
-		_, err = cmd.Output()
+	defer cancel()
+
+	// Create the command with the provided arguments
+	cmd := exec.CommandContext(ctx, cmdFields[0], cmdFields[1:]...)
+
+	// Capture stdout and stderr
+	var out strings.Builder
+	var stderr strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+
+	// Execute the command
+	err := cmd.Run()
+
+	// Check for errors in execution
+	if err != nil {
+		log.Printf("Error: %s\n", stderr.String())
+		return
+	}
+
+	// Here, we simulate that the command has generated a text file
+	// In real-world applications, you'd want to capture this from the command output
+	txtFileName := fileName + ".txt"
+	err = ioutil.WriteFile(txtFileName, []byte(out.String()), 0644)
+	if err != nil {
+		log.Printf("Error writing to file: %s\n", err)
+		return
+	}
+
+	log.Println("Done, should notify client now...")
+	// Notify clients that the txt file is ready for download
+	notifyClients(txtFileName)
+	log.Println("Should have notified clients by now.")
+}
+
+func notifyClients(fileName string) {
+	mutex.Lock()
+	log.Println("Clients: ", clients)
+	for client := range clients {
+		log.Println("This should show when notifying frontend that the file is ready.")
+		err := client.WriteMessage(1, []byte(fileName))
 		if err != nil {
-			fmt.Fprintf(w, "Failed to execute command: %s", err)
-			return
+			log.Printf("WebSocket error: %v", err)
+			client.Close()
+			delete(clients, client)
 		}
+	}
+	mutex.Unlock()
+	log.Println("Done.")
+}
 
-		// Assume whisper produces a .txt file
-		txtFileName := strings.Replace(tempFile.Name(), ".tmp", ".txt", 1)
-
-		// Serve txt file
-		http.ServeFile(w, r, txtFileName)
-
-		// Manually close tempFile
-		tempFile.Close()
-
-		// Files clean up
-		baseFileName := strings.TrimSuffix(tempFile.Name(), ".tmp")
-		extensions := []string{"txt", "json", "srt", "tmp", "tsv", "vtt"}
-
-		for _, ext := range extensions {
-			fileName := fmt.Sprintf("%s.%s", baseFileName, ext)
-			err := os.Remove(fileName)
-			if err != nil {
-				fmt.Printf("Failed to delete %s: %s\n", fileName, err)
-			}
-		}
-	})
-
-	fmt.Println("Server running on http://localhost:3000")
-	log.Fatal(http.ListenAndServe(":3001", nil))
+func getFormValueOrDefault(r *http.Request, key, defaultValue string) string {
+	if val := r.FormValue(key); val != "" {
+		return val
+	}
+	return defaultValue
 }
