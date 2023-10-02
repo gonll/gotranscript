@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>Transcriptor</title>
+</head>
+<body>
+
+    <div class="container mt-5">
+        <h1>Transcriptor a texto</h1>
+        <div class="rounded-3 bg-body-tertiary p-3">
+            <p>Transcribir es fácil. </p>
+            <p>Elegi el audio o video a transcribir, hace click en el botón azul de transcribir y esperá. Puede demorar mucho, en especial si el archivo que usas es pesado.</p>
+            <p>Cuando el proceso termine, se va a descargar el archivo transcripto automáticamente.</p>
+            <p class="">Recomendaciones: Usar audios antes que videos. Los audios mas livianos se transcriben más rápido. Podes comprimir tu audio grátis <a href="https://www.freeconvert.com/es/mp3-compressor"> haciendo click acá.</a></p>
+        </div>
+        <form enctype="multipart/form-data" id="upload-form" class="mt-4">
+            <div class="form-group">
+                <label for="files">Seleccioná un audio o video</label>
+                <input type="file" class="form-control-file" name="files">
+            </div>
+            <div class="form-group">
+                <label for="language">Lenguaje</label>
+                <select class="form-control" name="language" id="language">
+                    <option value="Spanish" selected>Spanish</option>
+                    <option value="English">English</option>
+                    <option value="Portuguese">Portuguese</option>
+                </select>
+            </div>
+            <!--div class="form-group">
+                <label for="model">Model</label>
+                <input type="text" class="form-control" name="model" placeholder="Model">
+            </div-->
+            <button type="submit" class="btn btn-primary my-4">Transcribir</button>
+        </form>
+        <div id="alert-box" class="alert alert-success mt-4" style="display:none;">
+            El archivo ya está listo. Fijate en descargas o <a id="download-link" href="#" class="alert-link">hace click acá </a>
+        </div>
+    </div>
+
+    <script>
+        const ws = new WebSocket("ws://localhost:3001/ws");
+        const alertBox = document.getElementById("alert-box");
+        const downloadLink = document.getElementById("download-link");
+
+        ws.addEventListener("message", function(event) {
+            const fileName = event.data;
+            downloadFile(fileName);
+            downloadLink.download = fileName;
+            alertBox.style.display = "block";
+        });
+
+        function downloadFile(fileName) {
+            const link = document.createElement("a");
+            link.href = `http://localhost:3001/download/${fileName}`;
+            link.download = fileName;
+            link.click();
+        }
+
+        const form = document.getElementById("upload-form");
+        form.addEventListener("submit", function(event) {
+            event.preventDefault();
+            const formData = new FormData(form);
+            fetch("/upload", {
+                method: "POST",
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("File uploaded:", data);
+            })
+            .catch(error => {
+                console.error("Upload failed:", error);
+            });
+        });
+    </script>
+</body>
+</html>
