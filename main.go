@@ -112,11 +112,40 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeFile(w, r, filePath)
 	// Delete the file
-	err := os.Remove(filePath)
-	if err != nil {
-		log.Printf("Failed to remove file: %v", err)
-	} else {
-		log.Println("File removed:", filePath)
+	deleteOldFiles()
+}
+
+func deleteOldFiles() {
+	// Get current time
+	now := time.Now()
+
+	// Path to your folder
+	dir := "./"
+
+	// Read directory for .txt and .tmp files
+	filePatterns := []string{"*.txt", "*.tmp"}
+	for _, pattern := range filePatterns {
+		files, _ := filepath.Glob(filepath.Join(dir, pattern))
+
+		for _, f := range files {
+			// Get file info
+			fileInfo, err := os.Stat(f)
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+
+			// Calculate time difference
+			if now.Sub(fileInfo.ModTime()) > (24 * time.Hour) {
+				// Delete file
+				err := os.Remove(f)
+				if err != nil {
+					log.Println(err)
+				} else {
+					log.Printf("Deleted: %s\n", f)
+				}
+			}
+		}
 	}
 }
 
