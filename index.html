@@ -24,6 +24,7 @@
             <div class="row">
                 <div class="form-group my-3 col-6">
                     <label for="language" class="fw-bold">Lenguaje</label>
+                    <p>En que idioma está el audio?</p>
                     <select class="form-control" name="language" id="language">
                         <option value="Spanish" selected>Español</option>
                         <option value="English">Ingles</option>
@@ -50,7 +51,7 @@
     </div>
 
     <script>
-        const ws = new WebSocket("ws://34.70.39.139/:8080/ws");
+        const ws = new WebSocket("ws://34.70.39.139:8080/ws");
         const alertBox = document.getElementById("alert-box");
         const downloadLink = document.getElementById("download-link");
 
@@ -64,7 +65,7 @@
 
         function downloadFile(fileName) {
             const link = document.createElement("a");
-            link.href = `http://34.70.39.139/:8080/download/${fileName}`;
+            link.href = `http://34.70.39.139:8080/download/${fileName}`;
             link.download = fileName;
             link.click();
         }
