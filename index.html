@@ -45,6 +45,12 @@
             </div>
             <button type="submit" class="btn btn-primary my-4">Transcribir</button>
         </form>
+        <div id="spinner" style="display: none;">
+            <img style="width: 16px; height: 16px;" src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/0.16.1/images/loader-large.gif" alt=""> Subiendo...
+        </div>
+        <div id="alert-upload" class="alert alert-success mt-4" style="display:none;">
+            El archivo ya se terminó de subir. Ahora estamos transcribiendolo a texto. Esto puede demorar.
+        </div>
         <div id="alert-box" class="alert alert-success mt-4" style="display:none;">
             El archivo ya está listo. Fijate en descargas o <a id="download-link" href="#" class="alert-link">hace click acá </a>
         </div>
@@ -53,14 +59,17 @@
     <script>
         const ws = new WebSocket("ws://34.70.39.139:8080/ws");
         const alertBox = document.getElementById("alert-box");
+        const alertUpload = document.getElementById("alert-upload");
+        const spinner = document.getElementById("spinner");
         const downloadLink = document.getElementById("download-link");
 
         ws.addEventListener("message", function(event) {
-            console.log("🚀 ~ message")
             const fileName = event.data;
             downloadFile(fileName);
             downloadLink.download = fileName;
             alertBox.style.display = "block";
+            spinner.style.display = "none";         
+            alertUpload.style.display = "none";
         });
 
         function downloadFile(fileName) {
@@ -68,10 +77,14 @@
             link.href = `http://34.70.39.139:8080/download/${fileName}`;
             link.download = fileName;
             link.click();
+            alertBox.style.display = "none";
         }
 
         const form = document.getElementById("upload-form");
         form.addEventListener("submit", function(event) {
+            alertBox.style.display = "none";            
+            alertUpload.style.display = "none";
+            spinner.style.display = "block";
             event.preventDefault();
             const formData = new FormData(form);
             fetch("/upload", {
@@ -80,7 +93,8 @@
             })
             .then(response => response.json())
             .then(data => {
-                console.log("File uploaded:", data);
+                console.log("File uploaded:", data);            
+                alertUpload.style.display = "block";
             })
             .catch(error => {
                 console.error("Upload failed:", error);
