@@ -41,7 +41,7 @@
     </div>
 
     <script>
-        const ws = new WebSocket("ws://216.238.102.16:8080/ws");
+        const ws = new WebSocket("ws://34.70.39.139/:8080/ws");
         const alertBox = document.getElementById("alert-box");
         const downloadLink = document.getElementById("download-link");
 
@@ -54,7 +54,7 @@
 
         function downloadFile(fileName) {
             const link = document.createElement("a");
-            link.href = `http://216.238.102.16:8080/download/${fileName}`;
+            link.href = `http://34.70.39.139/:8080/download/${fileName}`;
             link.download = fileName;
             link.click();
         }
