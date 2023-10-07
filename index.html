@@ -21,24 +21,26 @@
                 <label for="files">Seleccioná un audio o video</label>
                 <input type="file" class="form-control-file" name="files">
             </div>
-            <div class="form-group my-3 col-6">
-                <label for="language" class="fw-bold">Lenguaje</label>
-                <select class="form-control" name="language" id="language">
-                    <option value="Spanish" selected>Español</option>
-                    <option value="English">Ingles</option>
-                    <option value="Portuguese">Portugues</option>
-                </select>
-            </div>
-            <div class="form-group my-3 col-6">
-                <label for="model" class="fw-bold">Modelo</label>
-                <p>Si no sabes que es esto, no lo toques.</p>
-                <select class="form-control" name="model" id="model">
-                    <option default value="small" selected>Chico 🍌</option>
-                    <option value="base">Más chico 🪱</option>
-                    <option value="tiny">Infimo 🦠</option>
-                    <option value="medium">Grande 🍆</option>
-                    <option value="large">Gigante 🐻</option>
-                </select>
+            <div class="row">
+                <div class="form-group my-3 col-6">
+                    <label for="language" class="fw-bold">Lenguaje</label>
+                    <select class="form-control" name="language" id="language">
+                        <option value="Spanish" selected>Español</option>
+                        <option value="English">Ingles</option>
+                        <option value="Portuguese">Portugues</option>
+                    </select>
+                </div>
+                <div class="form-group my-3 col-6">
+                    <label for="model" class="fw-bold">Modelo</label>
+                    <p>Si no sabes que es esto, no lo toques.</p>
+                    <select class="form-control" name="model" id="model">
+                        <option default value="small" selected>Chico 🍌</option>
+                        <option value="base">Más chico 🪱</option>
+                        <option value="tiny">Infimo 🦠</option>
+                        <option value="medium">Grande 🍆</option>
+                        <option value="large">Gigante 🐻</option>
+                    </select>
+                </div>
             </div>
             <button type="submit" class="btn btn-primary my-4">Transcribir</button>
         </form>
@@ -53,6 +55,7 @@
         const downloadLink = document.getElementById("download-link");
 
         ws.addEventListener("message", function(event) {
+            console.log("🚀 ~ message")
             const fileName = event.data;
             downloadFile(fileName);
             downloadLink.download = fileName;
