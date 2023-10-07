@@ -112,6 +112,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func sendFileByEmail(filePath string) {
+	log.Println("Sending email...")
 	// Establece las credenciales de correo electrónico
 	smtpServer := "smtp.gmail.com"
 	emailSender := "gonzalohll@gmail.com"
