@@ -15,12 +15,16 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"gopkg.in/gomail.v2"
 )
 
 var mutex = &sync.Mutex{}
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 var clients = make(map[*websocket.Conn]bool)
@@ -40,6 +44,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Got a file upload request")
 	file, _, err := r.FormFile("files")
 	if err != nil {
 		http.Error(w, "Unable to read file", http.StatusBadRequest)
@@ -106,11 +111,44 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func sendFileByEmail(filePath string) {
+	// Establece las credenciales de correo electrónico
+	smtpServer := "smtp.gmail.com"
+	emailSender := "gonzalohll@gmail.com"
+	emailPassword := "ighn xupo nsmq rnmk"
+	emailRecipients := []string{"lourdescorrea9135@gmail.com", "gonzalohll@gmail.com"}
+
+	// Crear un mensaje de correo electrónico
+	msg := gomail.NewMessage()
+	msg.SetHeader("From", emailSender)
+	for _, recipient := range emailRecipients {
+		msg.SetHeader("To", recipient)
+	}
+	msg.SetHeader("Subject", "Transcripción de audio")
+	msg.SetBody("text/plain", "Este es el archivo generado...")
+
+	// Adjunta el archivo
+	msg.Attach(filePath)
+
+	// Inicia el cliente SMTP
+	d := gomail.NewDialer(smtpServer, 587, emailSender, emailPassword)
+
+	// Envía el correo electrónico
+	if err := d.DialAndSend(msg); err != nil {
+		log.Println(err)
+	}
+
+}
+
 func downloadHandler(w http.ResponseWriter, r *http.Request) {
 	fileName := filepath.Base(r.URL.Path)
 	filePath := "./" + fileName
 
 	http.ServeFile(w, r, filePath)
+
+	// Envía el archivo por correo electrónico
+	sendFileByEmail(filePath)
+
 	// Delete the file
 	deleteOldFiles()
 }
