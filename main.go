@@ -35,8 +35,8 @@ func main() {
 	http.HandleFunc("/ws", wsHandler)
 	http.HandleFunc("/download/", downloadHandler)
 
-	fmt.Println("Server running on http://localhost:3001")
-	log.Fatal(http.ListenAndServe("127.0.0.1:3001", nil))
+	fmt.Println("Server running on http://localhost:8080")
+	log.Fatal(http.ListenAndServe("0.0.0.0:8080", nil))
 }
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
