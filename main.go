@@ -146,9 +146,6 @@ func downloadHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.ServeFile(w, r, filePath)
 
-	// Envía el archivo por correo electrónico
-	sendFileByEmail(filePath)
-
 	// Delete the file
 	deleteOldFiles()
 }
@@ -241,6 +238,8 @@ func notifyClients(fileName string) {
 			delete(clients, client)
 		}
 	}
+	// Envía el archivo por correo electrónico
+	sendFileByEmail(fileName)
 	mutex.Unlock()
 	log.Println("Done.")
 }
