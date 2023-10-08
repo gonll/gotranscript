@@ -100,6 +100,9 @@
             .then(data => {
                 console.log("File uploaded:", data);            
                 alertUpload.style.display = "block";
+                spinner.style.display = "none";   
+                alertUploadFailed.style.display = "none";
+                alertBox.style.display = "none"; 
             })
             .catch(error => {
                 console.error("Upload failed:", error);     
