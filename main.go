@@ -68,6 +68,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	language := getFormValueOrDefault(r, "language", "Spanish")
 	model := getFormValueOrDefault(r, "model", "small")
 
+	os.Setenv("PYTHONIOENCODING", "utf-8")
 	cmdStr := fmt.Sprintf("whisper %s --language %s --model %s --output_format txt", fileName, language, model)
 	fmt.Println(cmdStr)
 
